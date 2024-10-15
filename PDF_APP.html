@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF to Excel Converter - Duplicate Questions</title>
+
+    <!-- Bootstrap CSS -->
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+
+    <!-- PDF.js Library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.9.359/pdf.min.js"></script>
+
+    <!-- SheetJS Library for Excel -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.17.0/xlsx.full.min.js"></script>
+
+    <!-- Custom CSS for colorful Navbar -->
+    <style>
+        .navbar {
+            background-color: #2C3E50; /* Tomato color */
+        }
+/* Default state */
+/* Default state */
+.navbar-nav .nav-item .nav-link {
+    color: white; /* Default text color (white) */
+    transition: background-color 0.3s ease, color 0.3s ease; /* Smooth transition */
+}
+
+/* Hover state */
+.navbar-nav .nav-item .nav-link:hover {
+    background-color: #181C14; /* Background color on hover */
+    color: rgb(252, 249, 249); /* Light color on hover */
+}
+
+/* Active and focus state */
+.navbar-nav .nav-item .nav-link:focus,
+.navbar-nav .nav-item .nav-link:active {
+    color: white; /* Ensure text remains white when clicked or focused */
+    background-color: #181C14; /* Keep the background color consistent */
+}
+        
+        .question {
+            text-align: left; /* Align question to the right */
+            font-weight: bold; /* Bold for better visibility */
+        }
+        .option {
+            text-align: left; /* Align options to the right */
+            list-style-type: disc; /* Use bullet points */
+        }
+        #pdfTextContainer {
+            white-space: pre-wrap; /* Preserve whitespace for readability */
+            background-color: #f8f9fa; /* Light background for contrast */
+            padding: 15px;
+            border: 1px solid #ccc;
+            border-radius: 5px; /* Slightly rounded corners */
+        }
+    </style>
+
+</head>
+<body>
+
+<!-- Navbar Section -->
+<nav class="navbar navbar-expand-lg navbar-light">
+    <a class="navbar-brand text-white" href="#">PDF to Excel</a>
+    <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+        <span class="navbar-toggler-icon"></span>
+    </button>
+    <div class="collapse navbar-collapse" id="navbarNav">
+        <ul class="navbar-nav ml-auto">
+            <li class="nav-item">
+                <a class="nav-link" href="#" onclick="showPage('duplicateQuestionPage')">Duplicate Question Find</a>
+            </li>
+        </ul>
+    </div>
+</nav>
+
+<!-- Main Content: Duplicate Question Finder Section -->
+<div class="container mt-5" id="duplicateQuestionPage" style="display:none;">
+    <div class="row">
+        <div class="col-md-8 offset-md-2 text-center">
+            <h1 class="mb-4">Find Duplicate Question From PDF</h1>
+
+            <!-- File Input for PDF Upload -->
+            <div class="form-group">
+                <label for="pdfUpload" class="font-weight-bold">Upload your PDF file</label>
+                <input type="file" id="pdfUpload" class="form-control-file" accept=".pdf">
+                <small id="status" class="form-text text-muted mt-2">No PDF uploaded yet.</small>
+            </div>
+
+            <button id="convertBtn" class="btn btn-primary mt-3" onclick="generateExcel()" disabled>Convert to Excel</button>
+
+            <!-- Preview of the extracted text (Optional) -->
+            <div class="mt-4">
+                <h4>Extracted Text (for preview)</h4>
+                <div id="pdfTextContainer"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Main Content: Home Section (Optional) -->
+<div class="container mt-5" id="homePage">
+    <div class="row">
+        <div class="col-md-8 offset-md-2 text-center">
+            <h1 class="mb-4">Welcome to PDF to Excel Converter</h1>
+            <p>Use the navigation bar to start finding duplicate questions in your PDF tests!</p>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Function to toggle between pages
+    function showPage(pageId) {
+        document.getElementById('homePage').style.display = 'none';
+        document.getElementById('duplicateQuestionPage').style.display = 'none';
+        
+        document.getElementById(pageId).style.display = 'block';
+    }
+
+    // Initially hide the Duplicate Question page
+    document.getElementById('duplicateQuestionPage').style.display = 'none';
+    document.getElementById('homePage').style.display = 'block';
+
+    let pdfText = "";
+    let isPdfLoaded = false;
+
+    // Function to read and extract text from the uploaded PDF
+    document.getElementById('pdfUpload').addEventListener('change', function (e) {
+        const file = e.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = function (event) {
+                const typedArray = new Uint8Array(event.target.result);
+                pdfjsLib.getDocument(typedArray).promise.then(function (pdf) {
+                    let pagesPromises = [];
+                    for (let i = 1; i <= pdf.numPages; i++) {
+                        pagesPromises.push(pdf.getPage(i).then(page => {
+                            return page.getTextContent().then(textContent => {
+                                let pageText = "";
+                                textContent.items.forEach(item => {
+                                    pageText += item.str + " "; // Extract all text from the page
+                                });
+                                return pageText;
+                            });
+                        }));
+                    }
+
+                    // Combine the extracted text after all pages are processed
+                    Promise.all(pagesPromises).then(pagesText => {
+                        pdfText = pagesText.join("\n"); // Combine all pages into one text
+                        displayExtractedText(pdfText); // Display the extracted text
+                        isPdfLoaded = true; // Set flag to true when PDF is fully loaded
+                        document.getElementById('status').textContent = 'PDF loaded successfully.';
+                        document.getElementById('convertBtn').disabled = false; // Enable the Convert button
+                    }).catch(error => {
+                        console.error("Error in extracting text from the PDF:", error);
+                        document.getElementById('status').textContent = 'Error in loading PDF.';
+                    });
+                });
+            };
+            reader.readAsArrayBuffer(file);
+            document.getElementById('status').textContent = 'Loading PDF...';
+            document.getElementById('convertBtn').disabled = true; // Disable the button while PDF is loading
+        }
+    });
+
+    // Function to display extracted text in a readable format
+    function displayExtractedText(text) {
+        const questionPattern = /(\d+\.\s.+?)(?=\s*\(A\))/g; // Regex to extract questions
+        const optionPattern = /\(\w\)\s*(.+?)(?=\s*\(\w\)|$)/g; // Regex to extract options
+
+        let questionMatches = text.match(questionPattern);
+        let formattedText = '';
+
+        if (questionMatches) {
+            questionMatches.forEach((question, index) => {
+                let firstDotIndex = question.indexOf(".");
+                if (firstDotIndex !== -1) {
+                    question = question.slice(firstDotIndex + 1).trim(); // Remove the question number
+                }
+
+                formattedText += `<div class="question">${question}</div>`; // Format the question
+                let optionsText = text.slice(text.indexOf(question) + question.length);
+                let optionsMatches = optionsText.match(optionPattern);
+
+                if (optionsMatches && optionsMatches.length >= 4) {
+                    optionsMatches = optionsMatches.slice(0, 4).map(option => {
+                        return option.replace(/^\(\w\)\s*/, '').trim(); // Remove option letter (A, B, C, etc.)
+                    });
+
+                    // Trim the 4th option to remove any text from the next question
+                    let fourthOption = optionsMatches[3];
+                    let nextQuestionIndex = fourthOption.search(/\d+\.\s/);
+                    if (nextQuestionIndex !== -1) {
+                        fourthOption = fourthOption.substring(0, nextQuestionIndex).trim();
+                    }
+                    optionsMatches[3] = fourthOption;
+
+                    formattedText += '<ul class="option" style="list-style-position: inside;">'; // Start bullet points
+                    optionsMatches.forEach(option => {
+                        formattedText += `<li>${option}</li>`; // Add each option
+                    });
+                    formattedText += '</ul>';
+                }
+                formattedText += '<br>'; // Add space between questions
+            });
+        } else {
+            formattedText = 'No questions found in the PDF.';
+        }
+
+        document.getElementById('pdfTextContainer').innerHTML = formattedText; // Display the formatted text
+    }
+
+    // Function to parse questions, identify duplicates, and generate Excel
+    function generateExcel() {
+        if (!isPdfLoaded || !pdfText) {
+            alert('Please wait for the PDF to finish loading before converting to Excel.');
+            return;
+        }
+
+        const questionPaperId = "QP12345";
+        const questionPattern = /(\d+\.\s.+?)(?=\s*\(A\))/g;  // Regex to match question text
+        const optionPattern = /\(\w\)\s*(.+?)(?=\s*\(\w\)|$)/g; // Regex to match option text
+
+        let allQuestions = [];
+        let duplicateQuestions = [];
+
+        let questionMatches = pdfText.match(questionPattern);
+        if (!questionMatches) {
+            alert('No questions found in the PDF.');
+            return;
+        }
+
+        questionMatches.forEach((question, index) => {
+            let firstDotIndex = question.indexOf(".");
+            if (firstDotIndex !== -1) {
+                question = question.slice(firstDotIndex + 1).trim();
+            }
+
+            let questionEndIndex = pdfText.indexOf(question) + question.length;
+            let optionsText = pdfText.slice(questionEndIndex);
+
+            let optionsMatches = optionsText.match(optionPattern);
+            if (optionsMatches && optionsMatches.length >= 4) {
+                optionsMatches = optionsMatches.slice(0, 4).map(option => {
+                    return option.replace(/^\(\w\)\s*/, '').trim();
+                });
+
+                // Trim the 4th option to remove any text from the next question
+                let fourthOption = optionsMatches[3];
+                let nextQuestionIndex = fourthOption.search(/\d+\.\s/);
+                if (nextQuestionIndex !== -1) {
+                    fourthOption = fourthOption.substring(0, nextQuestionIndex).trim();
+                }
+                optionsMatches[3] = fourthOption;
+
+                allQuestions.push({question, options: optionsMatches});
+            } else {
+                console.warn("Less than 4 options found for question: ", question);
+            }
+        });
+
+        // Function to check if two arrays have the same elements (ignoring order)
+        function areArraysEqual(arr1, arr2) {
+            if (arr1.length !== arr2.length) return false;
+            const sortedArr1 = [...arr1].sort();
+            const sortedArr2 = [...arr2].sort();
+            return sortedArr1.every((element, index) => element === sortedArr2[index]);
+        }
+
+        // Check for duplicates
+        for (let i = 0; i < allQuestions.length; i++) {
+            for (let j = i + 1; j < allQuestions.length; j++) {
+                if (allQuestions[i].question === allQuestions[j].question) {
+                    // Case 1 and 2: 100% matching question text
+                    if (areArraysEqual(allQuestions[i].options, allQuestions[j].options)) {
+                        // Options are the same (either exact match or shuffled)
+                        duplicateQuestions.push(allQuestions[i]);
+                        break;  // No need to check this question further
+                    }
+                    // Case 3: 100% matching question text but different options
+                    // We don't consider this as a duplicate, so we do nothing here
+                }
+            }
+        }
+
+        // Prepare rows for Excel
+        let rows = [
+            ["Question Paper ID", questionPaperId],
+            ["Question Text", "Option-1", "Option-2", "Option-3", "Option-4"]
+        ];
+
+        duplicateQuestions.forEach(q => {
+            rows.push([q.question, ...q.options]);
+        });
+
+        if (rows.length > 1) {
+            const wb = XLSX.utils.book_new();
+            const ws = XLSX.utils.aoa_to_sheet(rows);
+            XLSX.utils.book_append_sheet(wb, ws, "Duplicate Questions");
+            XLSX.writeFile(wb, "duplicate_questions_output.xlsx");
+        } else {
+            alert('No duplicate questions found.');
+        }
+    }
+</script>
+
+<!-- Bootstrap JS and dependencies -->
+<script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.9.2/dist/umd/popper.min.js"></script>
+<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+
+</body>
+</html>
